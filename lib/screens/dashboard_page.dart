@@ -5,27 +5,22 @@ import '../providers/agenda_provider.dart';
 import '../providers/notes_provider.dart';
 import '../providers/reminders_provider.dart';
 import '../models/espace.dart';
-import '../providers/settings_provider.dart';
 import '../providers/space_provider.dart';
 import '../providers/tasks_provider.dart';
+import '../providers/weather_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/french_date.dart';
+import '../utils/weather_codes.dart';
 import '../widgets/note_card.dart';
 import '../widgets/soft_card.dart';
 import 'groq_settings_page.dart';
 import 'note_editor_page.dart';
 import 'personal_memory_page.dart';
 import 'home_shell.dart';
+import 'weather_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
-
-  String _greeting(int hour) {
-    if (hour < 5) return 'Bonne nuit';
-    if (hour < 12) return 'Bonjour';
-    if (hour < 18) return 'Bon après-midi';
-    return 'Bonsoir';
-  }
 
   void _go(BuildContext context, Widget page) {
     Navigator.push(context, MaterialPageRoute(builder: (_) => page));
@@ -49,7 +44,7 @@ class DashboardPage extends StatelessWidget {
     final nextReminder = reminders.upcoming.isEmpty ? null : reminders.upcoming.first;
     final agendaUpcoming = context.watch<AgendaProvider>().upcoming;
     final nextEvent = agendaUpcoming.isEmpty ? null : agendaUpcoming.first;
-    final name = context.watch<SettingsProvider>().userName;
+    final weather = context.watch<WeatherProvider>();
     final space = context.watch<SpaceProvider>();
     final gradient = AppColors.heroGradient(DateTime.now().hour, espace: space.current);
     final now = DateTime.now();
@@ -126,14 +121,17 @@ class DashboardPage extends StatelessWidget {
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.only(right: 10),
-                    child: Text(
-                      '${_greeting(now.hour)}${name.isEmpty ? '' : ', $name'} 👋',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        height: 1.15,
-                      ),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (!weather.isLoading && weather.current == null) {
+                          // Échec de chargement : un tap relance la recherche météo.
+                          weather.refresh(force: true);
+                        } else {
+                          _go(context, const WeatherPage());
+                        }
+                      },
+                      child: _HeroWeather(weather: weather),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -404,6 +402,69 @@ class DashboardPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Bloc météo affiché dans l'en-tête à la place de la salutation.
+class _HeroWeather extends StatelessWidget {
+  const _HeroWeather({required this.weather});
+
+  final WeatherProvider weather;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = weather.current;
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: Row(children: [
+        if (weather.isLoading && current == null)
+          const SizedBox(
+            width: 30,
+            height: 30,
+            child: CircularProgressIndicator(
+              color: Colors.white,
+              strokeWidth: 2.5,
+            ),
+          )
+        else if (current == null)
+          const Icon(Icons.cloud_off_outlined, color: Colors.white, size: 36)
+        else
+          Icon(
+            weatherIcon(current.weatherCode, isDay: current.isDay),
+            color: Colors.white,
+            size: 42,
+          ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                current == null
+                    ? (weather.isLoading
+                        ? 'Chargement de la météo…'
+                        : 'Météo indisponible')
+                    : '${current.temperature.round()}° · ${weatherLabel(current.weatherCode)}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                current == null
+                    ? 'Toucher pour réessayer'
+                    : 'Météo à ${weather.cityName} — voir les prévisions',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        const Icon(Icons.chevron_right, color: Colors.white70),
+      ]),
     );
   }
 }
