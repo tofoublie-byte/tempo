@@ -15,6 +15,7 @@ import 'providers/reminders_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/space_provider.dart';
 import 'providers/tasks_provider.dart';
+import 'providers/weather_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,8 @@ Future<void> main() async {
   await remindersProvider.load();
   final agendaProvider = AgendaProvider(spaceProvider);
   await agendaProvider.load();
+  final weatherProvider = WeatherProvider(preferences);
+  await weatherProvider.load();
   try {
     await NotificationService.instance.initialize();
   } catch (_) {
@@ -43,6 +46,7 @@ Future<void> main() async {
       ChangeNotifierProvider<NotesProvider>.value(value: notesProvider),
       ChangeNotifierProvider<RemindersProvider>.value(value: remindersProvider),
       ChangeNotifierProvider<AgendaProvider>.value(value: agendaProvider),
+      ChangeNotifierProvider<WeatherProvider>.value(value: weatherProvider),
       ChangeNotifierProvider<SettingsProvider>(
         create: (_) => SettingsProvider(preferences),
       ),
